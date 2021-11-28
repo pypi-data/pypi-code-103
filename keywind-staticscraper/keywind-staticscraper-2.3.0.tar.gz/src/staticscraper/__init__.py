@@ -1,0 +1,1 @@
+from staticscraper import staticscraper
