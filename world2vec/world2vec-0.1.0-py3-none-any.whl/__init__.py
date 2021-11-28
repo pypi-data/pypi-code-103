@@ -1,0 +1,1 @@
+from world2vec.main import World2Vec
