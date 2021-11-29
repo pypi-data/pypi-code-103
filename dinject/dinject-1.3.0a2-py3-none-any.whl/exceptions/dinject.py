@@ -1,0 +1,2 @@
+class DinjectError(Exception):
+    pass
