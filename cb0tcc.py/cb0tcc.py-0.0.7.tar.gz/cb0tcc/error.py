@@ -1,0 +1,2 @@
+class Invalidurl(Exception):
+    pass
