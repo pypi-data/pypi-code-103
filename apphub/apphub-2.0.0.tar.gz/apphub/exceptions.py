@@ -1,0 +1,2 @@
+class AppHubException(Exception):
+    pass
