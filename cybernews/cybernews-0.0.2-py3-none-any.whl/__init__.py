@@ -1,0 +1,1 @@
+from cybernews import CyberNews
