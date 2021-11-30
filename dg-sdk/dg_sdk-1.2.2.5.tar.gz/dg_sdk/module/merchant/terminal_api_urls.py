@@ -1,0 +1,5 @@
+create = "/ssproxy/createDeviceApplyOrder"
+query_list = "/ssproxy/queryDeviceApplyOrderList"
+query_detail = "/ssproxy/queryDeviceApplyOrderDetail"
+cancel_apply = "/ssproxy/cancelDeviceApplyOrder"
+query_sale_plan = "/ssproxy/queryMerchantSalesStrategy"
