@@ -1,0 +1,2 @@
+class InflateError(Exception):
+  pass
