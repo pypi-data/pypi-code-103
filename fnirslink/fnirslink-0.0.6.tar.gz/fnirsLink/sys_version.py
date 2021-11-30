@@ -1,0 +1,1 @@
+import sysclass SysVersion:    PY3 = True    if sys.version > '3':        PY3 = True    else:        PY3 = Falseif __name__ == '__main__':    print(SysVersion.PY3)
