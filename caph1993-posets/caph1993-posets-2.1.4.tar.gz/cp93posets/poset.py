@@ -1,0 +1,2 @@
+# Deprecated
+from .posets import *
