@@ -1,0 +1,66 @@
+# -*- coding: utf-8 -*-
+
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
+
+import fast_tracker.packages.six as six
+
+from fast_tracker.api.external_trace import ExternalTrace
+from fast_tracker.api.transaction import current_transaction
+from fast_tracker.common.object_wrapper import wrap_function_wrapper
+from fast_tracker.common.span_enum import SpanType, SpanLayerAtrr
+
+
+def _nr_wrapper_factory(bind_params_fn, library):
+    def _nr_wrapper(wrapped, instance, args, kwargs):
+        transaction = current_transaction()
+
+        if transaction is None:
+            return wrapped(*args, **kwargs)
+
+        url = bind_params_fn(*args, **kwargs)
+
+        details = urlparse.urlparse(url)
+
+        if details.hostname is None:
+            return wrapped(*args, **kwargs)
+
+        with ExternalTrace(library, url, span_type=SpanType.Exit.value, span_layer=SpanLayerAtrr.HTTP.value):
+            return wrapped(*args, **kwargs)
+
+    return _nr_wrapper
+
+
+def bind_params_urlretrieve(url, *args, **kwargs):
+    return url
+
+
+def bind_params_open(fullurl, *args, **kwargs):
+    if isinstance(fullurl, six.string_types):
+        return fullurl
+    else:
+        return fullurl.get_full_url()
+
+
+def instrument(module):
+    if hasattr(module, 'urlretrieve'):
+        _nr_wrapper_urlretrieve_ = _nr_wrapper_factory(
+            bind_params_urlretrieve, 'urllib')
+
+        wrap_function_wrapper(module, 'urlretrieve', _nr_wrapper_urlretrieve_)
+
+    if hasattr(module, 'URLopener'):
+        _nr_wrapper_url_opener_open_ = _nr_wrapper_factory(
+            bind_params_open, 'urllib')
+
+        wrap_function_wrapper(module, 'URLopener.open',
+                              _nr_wrapper_url_opener_open_)
+
+    if hasattr(module, 'OpenerDirector'):
+        _nr_wrapper_opener_director_open_ = _nr_wrapper_factory(
+            bind_params_open, 'urllib2')
+
+        wrap_function_wrapper(module, 'OpenerDirector.open',
+                              _nr_wrapper_opener_director_open_)
