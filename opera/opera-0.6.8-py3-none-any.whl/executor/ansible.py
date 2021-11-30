@@ -1,0 +1,93 @@
+import json
+import os
+import sys
+import tempfile
+
+import yaml
+
+from opera.threading import utils as thread_utils
+from . import utils
+
+
+def _get_inventory(host):
+    inventory = dict(
+        ansible_host=host,
+        ansible_ssh_common_args="-o StrictHostKeyChecking=no",
+    )
+
+    if host == "localhost":
+        inventory["ansible_connection"] = "local"
+        inventory["ansible_python_interpreter"] = sys.executable
+    else:
+        inventory["ansible_user"] = os.environ.get("OPERA_SSH_USER", "centos")
+        opera_ssh_identity_file = os.environ.get("OPERA_SSH_IDENTITY_FILE")
+        if opera_ssh_identity_file is not None:
+            inventory["ansible_ssh_private_key_file"] = opera_ssh_identity_file
+
+    return yaml.safe_dump(dict(all=dict(hosts=dict(opera=inventory))))
+
+
+def run(host, primary, dependencies, artifacts, variables, verbose, workdir, validate):
+    # pylint: disable=too-many-locals
+    with tempfile.TemporaryDirectory() as dir_path:
+        playbook = os.path.join(dir_path, os.path.basename(primary))
+        utils.copy(os.path.join(workdir, primary), playbook)
+
+        for d in dependencies:
+            utils.copy(os.path.join(workdir, d), os.path.join(dir_path, os.path.basename(d)))
+        for a in artifacts:
+            utils.copy(os.path.join(workdir, a), os.path.join(dir_path, os.path.basename(a)))
+
+        inventory = utils.write(dir_path, _get_inventory(host), suffix=".yaml")
+        vars_file = utils.write(dir_path, yaml.safe_dump(variables), suffix=".yaml")
+
+        with open(f"{dir_path}/ansible.cfg", "w", encoding="utf-8") as fd:
+            fd.write("[defaults]\n")
+            fd.write("retry_files_enabled = False\n")
+
+            opera_ssh_host_key_checking = os.environ.get(
+                "OPERA_SSH_HOST_KEY_CHECKING")
+            if opera_ssh_host_key_checking is not None:
+                check = str(opera_ssh_host_key_checking).lower().strip()
+                if check[:1] == "f" or check[:1] == "false":
+                    fd.write("host_key_checking = False\n")
+
+        if verbose:
+            print("***inputs***")
+            print([f"{key}: {variables[key]}" for key in variables])
+            print("***inputs***")
+
+        cmd = [
+            "ansible-playbook",
+            "-i", inventory,
+            "-e", "@" + vars_file,
+            playbook
+        ]
+
+        if validate:
+            cmd.append("--syntax-check")
+
+        env = dict(
+            ANSIBLE_SHOW_CUSTOM_STATS="1",
+            ANSIBLE_STDOUT_CALLBACK="json",
+        )
+        code, out, err = utils.run_in_directory(dir_path, cmd, env)
+        if code != 0 or verbose:
+            thread_utils.print_thread("------------")
+            with open(out, encoding="utf-8") as fd:
+                for line in fd:
+                    print(line.rstrip())
+            thread_utils.print_thread("------------")
+            with open(err, encoding="utf-8") as fd:
+                for line in fd:
+                    print(line.rstrip())
+            thread_utils.print_thread("============")
+
+        if code != 0:
+            return False, {}
+
+        outputs = {}
+        if not validate:
+            with open(out, encoding="utf-8") as fd:
+                outputs = json.load(fd)["global_custom_stats"]
+        return code == 0, outputs
