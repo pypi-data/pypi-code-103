@@ -1,0 +1,61 @@
+KAMAFILE = 'kamafile'
+
+KTEA_TYPE_SERVER = 'server'
+KTEA_TYPE_MNG_SERVER = 'managed_server'
+KTEA_TYPE_LOCAL_EXEC = 'local_executable'
+KTEA_TYPE_VIRTUAL = 'virtual'
+
+ASSETS_PREFIX = "assets"
+SUPPLIER_PREFIX = "get"
+
+POS_STATUS = 'positive'
+NEG_STATUS = 'negative'
+SKIP_STATUS = 'skipped'
+
+IDLE_STATUS = 'idle'
+RUNNING_STATUS = 'running'
+BROKEN_STATUS = 'broken'
+ERROR_STATUS = 'error'
+
+APP_SPACE_ID = 'app'
+
+app_statuses = [
+  POS_STATUS,
+  NEG_STATUS,
+  RUNNING_STATUS,
+  BROKEN_STATUS,
+  IDLE_STATUS
+]
+
+TARGET_STANDARD = 'standard'
+TARGET_INLINE = 'inline'
+TARGET_STATE = 'state'
+TARGET_PREFS = 'prefs'
+
+TARGET_TYPES = [
+  TARGET_STANDARD,
+  TARGET_INLINE,
+  TARGET_STATE,
+  TARGET_PREFS
+]
+
+COMMIT_TARGET_TYPES = [
+  TARGET_STANDARD,
+  TARGET_INLINE,
+  TARGET_PREFS
+]
+
+
+DEFAULT_TARGET = TARGET_STANDARD
+
+MAIN_WORKER = 'default'
+TELEM_WORKER = 'telem'
+
+
+ACTION_STATUSES = [
+  POS_STATUS,
+  NEG_STATUS,
+  RUNNING_STATUS,
+  IDLE_STATUS,
+  SKIP_STATUS
+]
