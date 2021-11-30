@@ -1,0 +1,5 @@
+# ========= DEVICE ID GENERATOR ==========
+
+class Didgen():
+    def __init__(self):
+        self.deviceId = "17558D1C9542B52395B0532C5991E32C82A9AE9DF3E61566BA5599CA225732F8851A426DAEDB9BD6CB"
