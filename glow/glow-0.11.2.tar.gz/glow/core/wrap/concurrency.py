@@ -1,0 +1,142 @@
+__all__ = ['stream_batched', 'call_once', 'threadlocal', 'shared_call']
+
+import functools
+import threading
+import time
+from collections.abc import Callable, Sequence
+from concurrent.futures import Future
+from contextlib import ExitStack
+from queue import Empty, SimpleQueue
+from threading import Thread
+from typing import Any, TypeVar, cast
+from weakref import WeakValueDictionary
+
+_T = TypeVar('_T')
+_F = TypeVar('_F', bound=Callable)
+_ZeroArgsF = TypeVar('_ZeroArgsF', bound=Callable[[], Any])
+
+
+def threadlocal(fn: Callable[..., _T], *args: object,
+                **kwargs: object) -> Callable[[], _T]:
+    """Thread-local singleton factory, mimics `functools.partial`"""
+    local_ = threading.local()
+
+    def wrapper() -> _T:
+        try:
+            return local_.obj
+        except AttributeError:
+            local_.obj = fn(*args, **kwargs)
+            return local_.obj
+
+    return wrapper
+
+
+class _DeferredStack(ExitStack):
+    """
+    ExitStack that allows deferring.
+    When return value of callback function should be accessible, use this.
+    """
+    def defer(self, fn: Callable[..., _T], *args, **kwargs) -> Future[_T]:
+        future: Future[_T] = Future()
+
+        def apply(future: Future[_T]) -> None:
+            try:
+                result = fn(*args, **kwargs)
+            except BaseException as exc:  # noqa: PIE786
+                future.set_exception(exc)
+            else:
+                future.set_result(result)
+
+        self.callback(apply, future)
+        return future
+
+
+def call_once(fn: _ZeroArgsF) -> _ZeroArgsF:
+    """Makes `fn()` callable a singleton"""
+    lock = threading.RLock()
+
+    def wrapper():
+        with _DeferredStack() as stack, lock:
+            if fn._future is None:
+                # This way setting future is protected, but fn() is not
+                fn._future = stack.defer(fn)
+
+        return fn._future.result()
+
+    fn._future = None  # type: ignore
+    return cast(_ZeroArgsF, functools.update_wrapper(wrapper, fn))
+
+
+def shared_call(fn: _F) -> _F:
+    """Merges concurrent calls to `fn` with the same `args` to single one"""
+    lock = threading.RLock()
+    futures: WeakValueDictionary[str, Future] = WeakValueDictionary()
+
+    def wrapper(*args, **kwargs):
+        key = f'{fn}{args}{kwargs}'
+
+        with _DeferredStack() as stack, lock:
+            try:
+                future = futures[key]
+            except KeyError:
+                futures[key] = future = stack.defer(fn, *args, **kwargs)
+
+        return future.result()
+
+    return cast(_F, functools.update_wrapper(wrapper, fn))
+
+
+def _batch_apply(func: Callable, args: Sequence, futures: Sequence[Future]):
+    try:
+        results = func(args)
+        assert len(args) == len(results)
+    except BaseException as exc:  # noqa: PIE786
+        for fut in futures:
+            fut.set_exception(exc)
+    else:
+        for fut, res in zip(futures, results):
+            fut.set_result(res)
+
+
+def stream_batched(func=None, *, batch_size, latency=0.1, timeout=20.):
+    """
+    Delays start of computation up to `latency` seconds
+    in order to fill batch to batch_size items and
+    send it at once to target function.
+    `timeout` specifies timeout to wait results from worker.
+
+    Simplified version of https://github.com/ShannonAI/service-streamer
+    """
+    if func is None:
+        return functools.partial(
+            stream_batched,
+            batch_size=batch_size,
+            latency=latency,
+            timeout=timeout)
+
+    assert callable(func)
+    buf = SimpleQueue()
+
+    def _fetch_batch():
+        end_time = time.monotonic() + latency
+        for _ in range(batch_size):
+            try:
+                yield buf.get(timeout=end_time - time.monotonic())
+            except (Empty, ValueError):  # ValueError on negative timeout
+                return
+
+    def _serve_forever():
+        while True:
+            if batch := [*_fetch_batch()]:
+                _batch_apply(func, *zip(*batch))
+            else:
+                time.sleep(0.001)
+
+    def wrapper(batch):
+        futures = [Future() for _ in batch]
+        for item, fut in zip(batch, futures):
+            buf.put((item, fut))
+        return [f.result(timeout=timeout) for f in futures]
+
+    Thread(target=_serve_forever, daemon=True).start()
+    return functools.update_wrapper(wrapper, func)
