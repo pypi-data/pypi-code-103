@@ -1,0 +1,2 @@
+class CuscomException(Exception):
+    pass
