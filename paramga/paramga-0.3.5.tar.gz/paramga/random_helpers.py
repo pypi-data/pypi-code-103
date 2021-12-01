@@ -1,0 +1,12 @@
+import random
+import numpy as np
+
+
+def set_seed(seed):
+    def wrapper(fn):
+        def inner(*args, **kwargs):
+            random.seed(seed)
+            np.random.seed(seed)
+            return fn(*args, **kwargs)
+        return inner
+    return wrapper
