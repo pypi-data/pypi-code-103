@@ -1,0 +1,2 @@
+class Forest:
+    pass
