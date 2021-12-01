@@ -1,0 +1,1 @@
+from .automl.pipeline_generation import generate_sanatio_pipeline
