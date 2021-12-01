@@ -1,0 +1,2 @@
+def printVersion():
+    return "PYPI"
