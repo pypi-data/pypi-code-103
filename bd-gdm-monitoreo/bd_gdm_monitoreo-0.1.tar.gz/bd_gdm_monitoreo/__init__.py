@@ -1,0 +1,1 @@
+from bd_gdm_monitoreo.monitoreo import cargar_registro
