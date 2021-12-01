@@ -1,0 +1,116 @@
+import sys
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s, %(levelname)s: %(message)s")
+from pyfaidx import Fasta
+from offsetbasedgraph import NumpyIndexedInterval
+from numpy.random import randint
+import numpy as np
+from simple_read_mutator import Mutator
+from Bio.Seq import Seq
+
+
+class CoordinateMap():
+    def __init__(self, reference, haplotype):
+        self.reference = reference
+        self.haplotype = haplotype
+
+    @classmethod
+    def from_file(cls, file_name):
+        data = np.load(file_name)
+        return cls(data["reference"], data["haplotype"])
+
+    def convert(self, haplotype_coordinate):
+        index = np.searchsorted(self.haplotype, haplotype_coordinate)
+        # Find index of closest reference coordinate
+        diff_before = haplotype_coordinate - self.haplotype[index-1]
+        diff_after = haplotype_coordinate - self.haplotype[index]
+
+        if abs(diff_before) < abs(diff_after):
+            index -= 1
+            diff = diff_before
+        else:
+            diff = diff_after
+
+        corresponding_ref_coordinate = self.reference[index]
+        adjusted_ref_coordinate = corresponding_ref_coordinate + diff
+
+        return adjusted_ref_coordinate
+
+    def convert_reverse(self, reference_coordinate):
+        index = np.searchsorted(self.reference, reference_coordinate)
+        # Find index of closest reference coordinate
+        diff_before = reference_coordinate - self.reference[index - 1]
+        diff_after = reference_coordinate - self.reference[index]
+
+        if abs(diff_before) < abs(diff_after):
+            index -= 1
+            diff = diff_before
+        else:
+            diff = diff_after
+
+        corresponding_haplotype_coordinate = self.haplotype[index]
+        adjusted_haplotype_coordinate = corresponding_haplotype_coordinate + diff
+
+        return adjusted_haplotype_coordinate
+
+    def haplotype_has_variant_between(self, start, end):
+        return self.haplotype_coordinate_exists_between(start, end)
+
+    def haplotype_coordinate_exists_between(self, start, end):
+        index_start = np.searchsorted(self.haplotype, start)
+        index_end = np.searchsorted(self.haplotype, end)
+
+        if index_end > index_start:
+            return True
+
+        return False
+
+
+def simulate_reads(chromosome, haplotype, coverage=150, read_length=150, snv_prob=0.01, deletion_prob=0.001,
+                       insertion_prob=0.001, random_seed=1, data_base_name=""):
+    haplotype_fasta_file_name = "%schromosome%s_haplotype%s_reference.fasta" % (data_base_name, chromosome, haplotype)
+    coordinate_map = CoordinateMap.from_file("%scoordinate_map_chromosome%s_haplotype%s.npz" % (data_base_name, chromosome, haplotype))
+
+
+    np.random.seed(random_seed)
+    ref = Fasta(haplotype_fasta_file_name)
+    logging.info("CHromosomes: %s" % str(ref.keys()))
+    logging.info("Chromosome length: %s" % len(ref[chromosome]))
+    chrom_length = len(ref[chromosome])
+    chrom_min = 0
+    chrom_max = chrom_length - read_length - 10
+
+    n_reads = int(0.5 * coverage * chrom_length / read_length)
+    logging.info("Will simulate %d reads to get coverage %.3f on chromosome %s" % (n_reads, coverage, chromosome))
+    logging.warning("Coverage is halved, because assuming one wants half coverage on each haplotype")
+
+    mutator = Mutator(read_length + 10)
+
+    logging.info("Starting simulation")
+    i = 0
+
+    while i < n_reads:
+
+        start = randint(chrom_min, chrom_max)
+        end = start + read_length + 10
+        seq = str(ref[chromosome][start:end])
+
+        if np.random.randint(0, 2) == 1:
+            # reverse complement
+            seq = str(Seq(seq).reverse_complement())
+
+        if "n" in seq or "N" in seq:
+            continue
+
+        i += 1
+
+        ref_offset = coordinate_map.convert(start)
+        mutated_seq = mutator.mutate_sequence(seq, snv_prob, deletion_prob, insertion_prob)
+        mutated_seq = mutated_seq[0:read_length]
+
+        n_nodes_not_in_linear_ref = 0
+        if coordinate_map.haplotype_coordinate_exists_between(start, end):
+            n_nodes_not_in_linear_ref += 1
+
+        print("%s %d %d %s" % (chromosome, ref_offset, n_nodes_not_in_linear_ref, mutated_seq))
+
