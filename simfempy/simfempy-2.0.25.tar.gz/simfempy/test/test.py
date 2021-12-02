@@ -1,0 +1,3 @@
+import test_heat
+import test_stokes
+import test_elasticity
