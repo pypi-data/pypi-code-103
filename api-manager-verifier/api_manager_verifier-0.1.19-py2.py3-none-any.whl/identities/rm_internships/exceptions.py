@@ -1,0 +1,2 @@
+class RMLoginError(Exception):
+    pass
