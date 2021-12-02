@@ -1,0 +1,1 @@
+from .vqgan_jax.modeling_flax_vqgan import VQModel
