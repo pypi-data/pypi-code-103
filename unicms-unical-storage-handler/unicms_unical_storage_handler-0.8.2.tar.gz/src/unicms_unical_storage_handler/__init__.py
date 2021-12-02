@@ -1,0 +1,1 @@
+default_app_config = 'unicms_unical_storage_handler.apps.UniCMSUnicalStorageHandlerConfig'
