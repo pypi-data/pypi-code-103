@@ -1,0 +1,11 @@
+from .lib import freeze as freeze
+
+__version__ = "0.3.0"
+
+__all__ = [
+    "__version__",
+    "freeze",
+    "get_recursion_limit",
+    "set_recursion_limit",
+    "with_recursion_limit",
+]
