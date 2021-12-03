@@ -1,0 +1,1 @@
+from .GitAutoVersion import *
