@@ -1,0 +1,1 @@
+from jaepeto.docs.technical_docs import create_technical_doc
