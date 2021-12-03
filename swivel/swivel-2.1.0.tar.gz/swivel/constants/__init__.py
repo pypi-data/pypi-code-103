@@ -1,0 +1,4 @@
+DOMAIN_NAME = 'Swivel Finance'
+DOMAIN_VERSION = '2.0.0'
+
+HEX_PREFIX = '0x'
