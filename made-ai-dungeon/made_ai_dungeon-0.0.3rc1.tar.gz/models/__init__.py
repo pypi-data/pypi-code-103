@@ -1,0 +1,1 @@
+from made_ai_dungeon.models.gpt2generator import GPT2Generator
