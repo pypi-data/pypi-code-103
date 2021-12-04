@@ -1,0 +1,2 @@
+from kolibri.indexers.label_indexer import LabelIndexer
+from kolibri.indexers.text_indexer import TextIndexer
