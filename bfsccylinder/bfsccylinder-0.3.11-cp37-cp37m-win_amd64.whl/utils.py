@@ -1,0 +1,20 @@
+def assign_constant_ABD(bfsccylinder, prop):
+    bfsccylinder.A11[:] = prop.A11
+    bfsccylinder.A12[:] = prop.A12
+    bfsccylinder.A16[:] = prop.A16
+    bfsccylinder.A22[:] = prop.A22
+    bfsccylinder.A26[:] = prop.A26
+    bfsccylinder.A66[:] = prop.A66
+    bfsccylinder.B11[:] = prop.B11
+    bfsccylinder.B12[:] = prop.B12
+    bfsccylinder.B16[:] = prop.B16
+    bfsccylinder.B22[:] = prop.B22
+    bfsccylinder.B26[:] = prop.B26
+    bfsccylinder.B66[:] = prop.B66
+    bfsccylinder.D11[:] = prop.D11
+    bfsccylinder.D12[:] = prop.D12
+    bfsccylinder.D16[:] = prop.D16
+    bfsccylinder.D22[:] = prop.D22
+    bfsccylinder.D26[:] = prop.D26
+    bfsccylinder.D66[:] = prop.D66
+
