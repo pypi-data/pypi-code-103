@@ -1,0 +1,12 @@
+from dis_snek.http_requests.bot import BotRequests  # noqa
+from dis_snek.http_requests.channels import ChannelRequests  # noqa
+from dis_snek.http_requests.emojis import EmojiRequests  # noqa
+from dis_snek.http_requests.guild import GuildRequests  # noqa
+from dis_snek.http_requests.interactions import InteractionRequests  # noqa
+from dis_snek.http_requests.members import MemberRequests  # noqa
+from dis_snek.http_requests.messages import MessageRequests  # noqa
+from dis_snek.http_requests.reactions import ReactionRequests  # noqa
+from dis_snek.http_requests.stickers import StickerRequests  # noqa
+from dis_snek.http_requests.threads import ThreadRequests  # noqa
+from dis_snek.http_requests.users import UserRequests  # noqa
+from dis_snek.http_requests.webhooks import WebhookRequests  # noqa
