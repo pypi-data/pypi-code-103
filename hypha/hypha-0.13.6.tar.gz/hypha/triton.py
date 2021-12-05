@@ -1,0 +1,131 @@
+"""Provide the triton proxy."""
+import random
+from typing import Any, List
+
+import httpx
+from fastapi import APIRouter, Depends, Request, Response
+from pyotritonclient import execute, get_config
+
+from hypha.core.auth import login_optional
+from hypha.core.interface import CoreInterface
+
+
+class TritonProxy:
+    """A proxy for accessing triton inference servers."""
+
+    def __init__(
+        self, core_interface: CoreInterface, triton_servers: str, allow_origins: str
+    ) -> None:
+        """Initialize the triton proxy."""
+        # pylint: disable=broad-except
+        router = APIRouter()
+        self.core_interface = core_interface
+        self.servers = list(filter(lambda x: x.strip(), triton_servers))
+        self.servers = list(map(lambda x: x.rstrip("/"), self.servers))
+
+        @router.get("/triton/{path:path}")
+        @router.post("/triton/{path:path}")
+        async def triton_proxy(
+            path: str,
+            request: Request,
+            response: Response,
+            user_info: login_optional = Depends(login_optional),
+        ):
+            """Route for listing all the models."""
+            headers = dict(request.headers.items())
+            # with the host header, the server will return 404
+            del headers["host"]
+            params = request.query_params.multi_items()
+            server = random.choice(self.servers)
+            url = f"{server}/{path}"
+            # add cors headers
+            extra_headers = {}
+            extra_headers["Access-Control-Expose-Headers"] = (
+                "Inference-Header-Content-Length,"
+                "Accept-Encoding,Content-Encoding,"
+                "Range,Origin,Content-Type"
+            )
+            request_origin = request.headers.get("origin")
+            if request_origin and (
+                allow_origins == "*"
+                or allow_origins[0] == "*"
+                or request_origin in allow_origins
+            ):
+                extra_headers["Access-Control-Allow-Origin"] = request_origin
+            extra_headers["Access-Control-Allow-Credentials"] = "true"
+            extra_headers["Access-Control-Allow-Methods"] = "GET,HEAD,OPTIONS,PUT,POST"
+            extra_headers["Access-Control-Allow-Headers"] = (
+                "Inference-Header-Content-Length,Accept-Encoding,"
+                "Content-Encoding,Access-Control-Allow-Headers,Origin,"
+                "Accept,X-Requested-With,Content-Type,"
+                "Access-Control-Request-Method,"
+                "Access-Control-Request-Headers,Range"
+            )
+            response.headers.update(extra_headers)
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                try:
+                    if request.method == "GET":
+                        proxy = await client.get(url, params=params, headers=headers)
+                        response.headers.update(proxy.headers)
+                        response.body = proxy.content
+                        response.status_code = proxy.status_code
+                        return response
+
+                    if request.method == "POST":
+
+                        async def request_streamer():
+                            async for chunk in request.stream():
+                                yield chunk
+
+                        # Use a stream to access raw request body (with compression)
+                        async with client.stream(
+                            "POST",
+                            url,
+                            data=request_streamer(),
+                            params=params,
+                            headers=headers,
+                        ) as proxy:
+                            response.headers.update(proxy.headers)
+                            body = b""
+                            async for chunk in proxy.aiter_raw():
+                                body += chunk
+                            response.body = body
+                            response.status_code = proxy.status_code
+                            return response
+                except httpx.RequestError as exc:
+                    response.status_code = 500
+                    response.body = (
+                        "An error occurred while " + f"requesting {exc.request.url!r}."
+                    ).encode("utf-8")
+                    return response
+
+        core_interface.register_router(router)
+        core_interface.register_service_as_root(self.get_triton_service())
+
+    async def execute(
+        self, model_name: str, inputs: List[Any], server_url=None, **kwargs
+    ):
+        """Execute the triton inference."""
+        if server_url is None:
+            server_url = random.choice(self.servers)
+        results = await execute(
+            inputs, server_url=server_url, model_name=model_name, **kwargs
+        )
+        return results
+
+    async def get_config(self, model_name: str, server_url=None, **kwargs):
+        """Return the config for the triton model."""
+        if server_url is None:
+            server_url = random.choice(self.servers)
+        return await get_config(server_url=server_url, model_name=model_name, **kwargs)
+
+    def get_triton_service(self):
+        """Return the triton service."""
+        return {
+            "_rintf": True,
+            "name": "triton-client",
+            "type": "triton-client",
+            "config": {"visibility": "public"},
+            "execute": self.execute,
+            "get_config": self.get_config,
+        }
