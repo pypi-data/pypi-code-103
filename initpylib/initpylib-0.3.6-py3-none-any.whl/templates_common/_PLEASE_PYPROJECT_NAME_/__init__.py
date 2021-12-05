@@ -1,0 +1,1 @@
+from .__PLEASE_PYPROJECT_NAME_ import _PLEASE_PYPROJECT_NAME_  # noqa: F401
