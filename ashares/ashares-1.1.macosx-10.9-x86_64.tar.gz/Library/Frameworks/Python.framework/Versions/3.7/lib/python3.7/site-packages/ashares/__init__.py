@@ -1,0 +1,2 @@
+from ashares.Ashare import *
+
