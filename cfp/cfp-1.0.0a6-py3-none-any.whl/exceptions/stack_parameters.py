@@ -1,0 +1,2 @@
+class StackParametersError(Exception):
+    pass
