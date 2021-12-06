@@ -1,0 +1,328 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# File              : Ampel-interface/ampel/view/SnapView.py
+# License           : BSD-3-Clause
+# Author            : vb <vbrinnel@physik.hu-berlin.de>
+# Date              : 13.01.2018
+# Last Modified Date: 10.11.2021
+# Last Modified By  : vb <vbrinnel@physik.hu-berlin.de>
+
+from datetime import datetime
+from typing import Dict, Optional, Union, Any, Literal, Sequence, Callable, Tuple, Type, overload
+
+
+from ampel.types import StockId, UBson, T
+from ampel.struct.AmpelBuffer import AmpelBuffer
+from ampel.content.DataPoint import DataPoint
+from ampel.content.T1Document import T1Document
+from ampel.content.T2Document import T2Document
+from ampel.content.T3Document import T3Document
+from ampel.content.StockDocument import StockDocument
+from ampel.content.LogDocument import LogDocument
+from ampel.content.JournalRecord import JournalRecord
+
+
+class SnapView:
+	"""
+	View of a given ampel object (with unique stock id).
+
+	This class references various instances of objects from
+	package ampel.content, originating from different ampel tiers.
+	It can also contain external/composite objects embedded in the dict called 'extra',
+	for example spectra or cutout images.
+	The config parameter of a T3 process determines which information are included.
+	Instances of this class (or of subclass such as
+	:class:`~ampel.view.TransientView.TransientView`) are provided to
+	:meth:`AbsT3Unit.process() <ampel.abstract.AbsT3Unit.AbsT3Unit.process>`.
+
+	"""
+
+	__slots__ = 'id', 'stock', 'origin', 't0', 't1', 't2', 't3', 'logs', 'extra', '_frozen'
+
+
+	@classmethod
+	def of(cls, ampel_buffer: AmpelBuffer) -> 'SnapView':
+		return cls(**ampel_buffer)
+
+
+	def __init__(self,
+		id: StockId,
+		stock: Optional[StockDocument] = None,
+		origin: Optional[Union[int, Sequence[int]]] = None,
+		t0: Optional[Sequence[DataPoint]] = None,
+		t1: Optional[Sequence[T1Document]] = None,
+		t2: Optional[Sequence[T2Document]] = None,
+		t3: Optional[Sequence[T3Document]] = None,
+		logs: Optional[Sequence[LogDocument]] = None, # Logs, if added by T3 complement stage
+		extra: Optional[Dict[str, Any]] = None, # Free-form information addable via instances of AbsBufferComplement
+		freeze: bool = True
+	):
+		self.stock = stock
+		self.origin = origin
+		self.t0 = t0
+		self.t1 = t1
+		self.t2 = t2
+		self.t3 = t3
+		self.extra = extra
+		self.logs = logs
+		self.id = id
+		self._frozen = freeze
+
+
+	def freeze(self):
+		if not self._frozen:
+			self._frozen = True
+
+
+	def __setattr__(self, k, v):
+		if getattr(self, '_frozen', False):
+			raise ValueError('SnapView is read only')
+		object.__setattr__(self, k, v)
+
+
+	def serialize(self) -> Dict:
+		return {k: getattr(self, k) for k in self.__slots__}
+
+
+	def get_t2_docs(self,
+		unit_id: Optional[Union[int, str]] = None,
+		link_id: Optional[int] = None
+	) -> Optional[Sequence[T2Document]]:
+		"""
+		Get a subset of T2 documents.
+
+		:param unit_id: limits the returned science record(s) to the one with the provided t2 unit id
+		:param link_id: whether to return the latest science record(s) or not (default: False)
+
+		"""
+
+		if self.t2 is None:
+			return None
+
+		if link_id:
+
+			if unit_id:
+				return tuple(
+					rec for rec in self.t2
+					if rec['link'] == link_id and rec['unit'] == unit_id
+				)
+
+			return tuple(rec for rec in self.t2 if rec['link'] == link_id)
+
+		if unit_id:
+			return tuple(rec for rec in self.t2 if rec['unit'] == unit_id)
+
+		return self.t2
+
+
+	def get_latest_t2_body(self,
+		unit_id: Union[int, str],
+		link_id: Optional[int] = None,
+		code: Optional[Union[int]] = None,
+	) -> UBson:
+		"""
+		Get latest t2 body element from a given unit.
+
+		:param unit_id: target unit id
+		:param link_id: restrict to a specific link
+		"""
+
+		# from the records that match the unit and compound selection,
+		# return the last record that has a result
+		for t2 in self.get_t2_docs(unit_id, link_id) or []:
+			if code is not None and t2['code'] != code:
+				continue
+			for subrecord in reversed(t2.get('body') or []):
+				if subrecord:
+					return subrecord
+		return None
+
+
+	@overload
+	def get_t2_value(self,
+		key: None, rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: bool = ..., require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Optional[T]:
+		...
+
+	@overload
+	def get_t2_value(self,
+		key: str, rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: bool = ..., require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Optional[T]:
+		...
+
+	@overload
+	def get_t2_value(self,
+		key: tuple[str, str], rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: Literal[False], require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Tuple[Optional[T], Optional[T]]:
+		...
+	@overload
+	def get_t2_value(self,
+		key: tuple[str, str], rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: Literal[True], require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Optional[Tuple[T, T]]:
+		...
+
+	@overload
+	def get_t2_value(self,
+		key: tuple[str, str, str], rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: Literal[False], require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Tuple[Optional[T], Optional[T], Optional[T]]:
+		...
+	@overload
+	def get_t2_value(self,
+		key: tuple[str, str, str], rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: Literal[True], require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Optional[Tuple[T, T, T]]:
+		...
+
+	@overload
+	def get_t2_value(self,
+		key: tuple[str, str, str, str], rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: Literal[False], require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Optional[Tuple[Optional[T], Optional[T], Optional[T], Optional[T]]]:
+		...
+	@overload
+	def get_t2_value(self,
+		key: tuple[str, str, str, str], rtype: Type[T], unit: Union[str, tuple[str, ...]], *,
+		no_none: Literal[True], require_all_keys: bool = ..., code: int = ..., data_slice: int = ...
+	) -> Optional[Tuple[T, T, T, T]]:
+		...
+
+	def get_t2_value(self,
+		key: Union[None, str, tuple[str, ...]],
+		rtype: Type[T],
+		unit: Union[str, tuple[str, ...]], *,
+		no_none: bool = False,
+		require_all_keys: bool = True,
+		code: int = 0,
+		data_slice: int = -1
+	) -> Optional[Union[Optional[T], Tuple[Optional[T], ...]]]:
+		"""
+		Examples:
+		get_t2_value("fit_result", dict, ["T2NedSNCosmo", "T2SNCosmo"])
+		get_t2_value(("z", "zunc"), float, "T2NedTap")
+		get_t2_value(None, dict, "T2NedSNCosmo")
+
+		key = ("a", "b")
+		t2_result: {'body': [{'data': {'a': 1}}]} or {'body': [{'data': {'a': 1, 'b': None, 'c': 3}}]}
+		no_none = False -> (1, None) | no_none = True -> None
+		"""
+
+		for ustr in [unit] if isinstance(unit, str) else unit:
+
+			if (x := self.get_latest_t2_body(unit_id=ustr, code=code)) is None:
+				continue
+
+			if not isinstance(x, dict):
+				continue
+
+			if 'data' not in x or len(x['data']) == 0:
+				continue
+
+			r = x['data'][data_slice]
+
+			if key is None:
+				return r if isinstance(r, rtype) else None
+
+			if isinstance(key, str):
+				if key in r:
+					return r[key]
+				continue
+
+			if require_all_keys:
+				if len(r.keys() & key) == len(key):
+					t = tuple(r[k] for k in key)
+					return None if (None in t and no_none) else t
+				continue
+
+			if r.keys() & key:
+				return tuple(r[k] if k in r else None for k in key)
+
+		if key is None or isinstance(key, str):
+			return None
+
+		return None
+
+
+	def get_journal_entries(self,
+		tier: Optional[Literal[0, 1, 2, 3]] = None,
+		process_name: Optional[str] = None,
+		filter_func: Optional[Callable[[JournalRecord], bool]] = None,
+	) -> Optional[Sequence[JournalRecord]]:
+		"""
+		Get a subset of journal entries.
+
+		:param tier: return only journal entries associated with the given tier
+		:param process_name: return only journal entries associated with a given process name
+		:param latest: return only the latest entry in the journal (the latest in time)
+
+		:returns:
+			journal entries corresponding to a given tier and/or job,
+			sorted by timestamp.
+		"""
+
+		if not self.stock:
+			return None
+
+		entries = self.stock['journal']
+
+		if tier is not None:
+			entries = tuple(j for j in entries if j['tier'] == tier)
+
+		if process_name is not None:
+			entries = tuple(j for j in entries if j['process'] == process_name)
+
+		if filter_func is not None:
+			entries = tuple(j for j in entries if filter_func(j))
+
+		return sorted(entries, key=lambda x: x['ts'])
+
+
+	def get_time_created(self,
+		output: Literal['raw', 'datetime', 'str'] = 'raw'
+	) -> Optional[Union[float, datetime, str]]:
+		""" """
+		if not self.stock:
+			return None
+		# Note: journal cannot be empty
+		return self._get_time(self.stock['journal'][0], output)
+
+
+	def get_time_updated(self,
+		output: Literal['raw', 'datetime', 'str'] = 'raw'
+	) -> Optional[Union[float, datetime, str]]:
+		""" """
+		if not self.stock:
+			return None
+		# Note: journal cannot be empty
+		return self._get_time(self.stock['journal'][-1], output)
+
+
+	@classmethod
+	def _get_time(cls,
+		entry: JournalRecord,
+		output: Optional[Union[bool, str]] = None
+	) -> Union[float, str, datetime]:
+		""" """
+		if output == 'raw':
+			return entry['ts']
+
+		dt = datetime.fromtimestamp(entry['ts'])
+
+		if output == 'datetime':
+			return dt
+
+		return dt.strftime('%d/%m/%Y %H:%M:%S')
+
+
+	@staticmethod
+	def content_summary(view: 'SnapView') -> str:
+
+		return 'DP: %i, CP: %i, T2: %i' % (
+			len(view.t0) if view.t0 else 0,
+			len(view.t1) if view.t1 else 0,
+			len(view.t2) if view.t2 else 0
+		)
