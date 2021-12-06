@@ -1,0 +1,7 @@
+reg_usr_ent_base_info = "/ssproxy/regUsrEntBaseInfo"
+reg_usr_indv_base_info = "/ssproxy/regUsrIndvBaseInfo"
+query_acct_info_list = "/ssproxy/queryAcctInfoList"
+modify_usr_ent_base_info = "/ssproxy/modifyUsrEntBaseInfo"
+modify_use_indv_base_info = "/ssproxy/modifyUseIndvBaseInfo"
+reg_usr_busi_info = "/ssproxy/regUsrBusiInfo"
+query_user_detail = "/ssproxy/queryUserDetail"
