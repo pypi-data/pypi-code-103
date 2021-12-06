@@ -1,0 +1,58 @@
+"""Utils module."""
+
+DEFAULT_CONTEXT_PATH = "data"
+DEFAULT_OUTPUT_PATH = "models"
+DEFAULT_DATASET_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls"
+
+TARGET = "default payment next month"
+
+LIMIT_BAL = "LIMIT_BAL"
+SEX = "SEX"
+EDUCATION = "EDUCATION"
+MARRIAGE = "MARRIAGE"
+AGE = "AGE"
+PAY_0 = "PAY_0"
+PAY_2 = "PAY_2"
+PAY_3 = "PAY_3"
+PAY_4 = "PAY_4"
+PAY_5 = "PAY_5"
+PAY_6 = "PAY_6"
+BILL_AMT1 = "BILL_AMT1"
+BILL_AMT2 = "BILL_AMT2"
+BILL_AMT3 = "BILL_AMT3"
+BILL_AMT4 = "BILL_AMT4"
+BILL_AMT5 = "BILL_AMT5"
+BILL_AMT6 = "BILL_AMT6"
+PAY_AMT1 = "PAY_AMT1"
+PAY_AMT2 = "PAY_AMT2"
+PAY_AMT3 = "PAY_AMT3"
+PAY_AMT4 = "PAY_AMT4"
+PAY_AMT5 = "PAY_AMT5"
+PAY_AMT6 = "PAY_AMT6"
+
+NUMERICAL_FEATURES = [
+    LIMIT_BAL,
+    AGE,
+    PAY_0,
+    PAY_2,
+    PAY_3,
+    PAY_4,
+    PAY_5,
+    PAY_6,
+    BILL_AMT1,
+    BILL_AMT2,
+    BILL_AMT3,
+    BILL_AMT4,
+    BILL_AMT5,
+    BILL_AMT6,
+    PAY_AMT1,
+    PAY_AMT2,
+    PAY_AMT3,
+    PAY_AMT4,
+    PAY_AMT5,
+    PAY_AMT6,
+]
+
+CATEGORICAL_FEATURES = [SEX, EDUCATION, MARRIAGE]
+
+FEATURES = CATEGORICAL_FEATURES + NUMERICAL_FEATURES
