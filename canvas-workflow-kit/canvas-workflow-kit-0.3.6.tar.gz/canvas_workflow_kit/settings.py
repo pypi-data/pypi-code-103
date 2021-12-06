@@ -1,0 +1,12 @@
+
+from decouple import config
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+
+INTEGRATION_SERVICE_ENDPOINT = config('INTEGRATION_SERVICE_ENDPOINT', '')
+
+INTEGRATION_SERVICE_USERNAME = config('INTEGRATION_SERVICE_USERNAME', '')
+INTEGRATION_SERVICE_PASSWORD = config('INTEGRATION_SERVICE_PASSWORD', '')
+
+IS_HEALTHCHEC = True
