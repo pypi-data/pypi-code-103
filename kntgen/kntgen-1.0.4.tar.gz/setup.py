@@ -1,0 +1,43 @@
+from setuptools import setup
+
+from kntgen import __version__
+
+with open('README.md', 'r') as readme:
+    long_description = readme.read()
+
+setup(
+    name='kntgen',
+    version=__version__,
+    author='kiendtvt1411',
+    author_email='dtvtdevelopersk58@gmail.com',
+    description='A generator for Dart code using by Appixi\'s projects',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    license='MIT',
+    url='https://github.com/appixi/knt_dart_generator',
+    packages=['kntgen', 'kntgen_templates'],
+    entry_points={
+        'console_scripts': [
+            'kntgen = kntgen.__main__:main'
+        ]
+    },
+    install_requires=[
+        'arghandler>=1.2',
+        'regex',
+        'googletrans==4.0.0rc1',
+        'requests',
+        'pyyaml',
+        'tqdm',
+        'jinja2>=2.10',
+        'pydantic',
+        'sheetfu'
+    ],
+    classifiers=[
+        'Programming Language :: Python :: 3.9',
+        'Intended Audience :: Developers',
+        'Topic :: Software Development :: Build Tools',
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: OS Independent'
+    ],
+    include_package_data=True
+)
