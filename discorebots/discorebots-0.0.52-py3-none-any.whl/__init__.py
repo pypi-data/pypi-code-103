@@ -1,0 +1,1 @@
+from .discorebots import setupBot
